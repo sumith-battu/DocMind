@@ -1,0 +1,27 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: doc-postgres
+    environment:
+      POSTGRES_USER: docuser
+      POSTGRES_PASSWORD: docpass
+      POSTGRES_DB: docintel
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  localstack:
+    image: localstack/localstack:4.4.0
+    container_name: doc-localstack
+    environment:
+      - SERVICES=s3,sqs
+    ports:
+      - "4566:4566"
+    volumes:
+      - localstackdata:/var/lib/localstack
+      - ./localstack/init:/etc/localstack/init/ready.d
+
+volumes:
+  pgdata:
+  localstackdata:
