@@ -114,6 +114,11 @@ def extract_and_index(doc_id, path):
     print(f"Completed processing: {chunk_index} chunks")
     return page_count, chunk_index
 
+def mark_failed(key):
+    with psycopg.connect(DB_CONN) as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE documents SET status='FAILED', updated_at=now() WHERE s3_key=%s",(key,))
+
 def process_record(record):
     bucket = record["s3"]["bucket"]["name"]
     key = record["s3"]["object"]["key"]
@@ -132,29 +137,40 @@ def process_record(record):
         tmp_path = download_to_temp(bucket, key)
         page_count, chunk_count = extract_and_index(doc_id, tmp_path)
         print(f"READY -> {key} ({page_count} pages, {chunk_count} chunks)")
-    except Exception as e:
-        with psycopg.connect(DB_CONN) as conn:
-            with conn.cursor() as cur:
-                cur.execute("UPDATE documents SET status='FAILED', updated_at=now() WHERE id=%s", (doc_id,))
-        print(f"FAILED -> {key}: {e}")
+    # except Exception as e:
+    #     with psycopg.connect(DB_CONN) as conn:
+    #         with conn.cursor() as cur:
+    #             cur.execute("UPDATE documents SET status='FAILED', updated_at=now() WHERE id=%s", (doc_id,))
+    #     print(f"FAILED -> {key}: {e}")
     finally:
         if tmp_path and os.path.exists(tmp_path):
             os.remove(tmp_path)
 
+
+MAX_RECEIVE_COUNT = 3
 
 while True:
     response = sqs.receive_message(
         QueueUrl = queue_url,
         MaxNumberOfMessages=5,
         WaitTimeSeconds=10,
+        AttributeNames=["ApproximateReceiveCount"],
     )
 
     for message in response.get("Messages", []):
+        receive_count = int(message.get("Attributes", {}).get("ApproximateReceiveCount", "1"))
         body = json.loads(message["Body"])
 
         if body.get("Event") == "s3:TestEvent":
             print("Received S3 test event, skipping")
-        else:
+            sqs.delete_message(QueueUrl=queue_url, ReceiptHandle=message["ReceiptHandle"])
+            continue
+        try:
             for record in body.get("Records", []):
                 process_record(record)
-        sqs.delete_message(QueueUrl=queue_url, ReceiptHandle=message["ReceiptHandle"])
+            sqs.delete_message(QueueUrl=queue_url, ReceiptHandle=message["ReceiptHandle"])
+        except Exception as e:
+            print(f"Processing failed (attempt {receive_count}/{MAX_RECEIVE_COUNT}): {e}")
+            if receive_count >= MAX_RECEIVE_COUNT:
+                for record in body.get("Records", []):
+                    mark_failed(record["s3"]["object"]["key"])
