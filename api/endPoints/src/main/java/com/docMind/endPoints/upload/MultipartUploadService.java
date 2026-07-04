@@ -41,11 +41,11 @@ public class MultipartUploadService {
     }
 
     @Transactional
-    public InitiateUploadResponse initiate(InitiateUploadRequest request) {
+    public InitiateUploadResponse initiate(String ownerId,InitiateUploadRequest request) {
         OffsetDateTime now = OffsetDateTime.now();
 
         Document doc = new Document();
-        doc.setOwnerId("demo-user");
+        doc.setOwnerId(ownerId);
         doc.setFilename(request.filename());
         doc.setStatus("UPLOADING");
         doc.setCreatedAt(now);
