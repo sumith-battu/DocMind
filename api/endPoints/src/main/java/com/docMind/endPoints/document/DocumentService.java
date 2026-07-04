@@ -25,11 +25,11 @@ public class DocumentService {
 	}
 	
 	@Transactional
-	public DocumentResponse createDocument(CreateDocumentRequest request) {
+	public DocumentResponse createDocument(String ownerId, CreateDocumentRequest request) {
 		OffsetDateTime now = OffsetDateTime.now();
 		
 		Document doc = new Document();
-		doc.setOwnerId("demo-user");
+		doc.setOwnerId(ownerId);
 		doc.setFilename(request.filename());
 		doc.setStatus("UPLOADING");
 		doc.setCreatedAt(now);
@@ -42,7 +42,7 @@ public class DocumentService {
 		
 		
 		String uploadUrl = generateUploadUrl(key);
-		return new DocumentResponse(saved.getId(), saved.getFilename(), saved.getStatus(), uploadUrl);
+		return new DocumentResponse(saved.getId(), saved.getFilename(), saved.getOwnerId(), saved.getStatus(), uploadUrl);
 	}
 	
 	private String generateUploadUrl(String key) {

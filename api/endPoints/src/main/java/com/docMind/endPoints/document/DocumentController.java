@@ -4,6 +4,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -20,8 +21,10 @@ public class DocumentController {
 	
 	
 	@PostMapping
-	public ResponseEntity<DocumentResponse> create(@Valid @RequestBody CreateDocumentRequest request){
-		DocumentResponse response = service.createDocument(request);
+	public ResponseEntity<DocumentResponse> create(
+			@RequestHeader(value = "X-Anonymous-Id", defaultValue = "demo-user") String anonId,
+			@Valid @RequestBody CreateDocumentRequest request){
+		DocumentResponse response = service.createDocument(anonId, request);
 		return ResponseEntity.status(HttpStatus.CREATED).body(response);
 	}
 }
